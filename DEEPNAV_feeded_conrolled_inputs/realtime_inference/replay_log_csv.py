@@ -20,8 +20,12 @@ import sys
 import pandas as pd
 import rospy
 from geometry_msgs.msg import PoseStamped, TwistStamped
+
 from sensor_msgs.msg import Imu, MagneticField
 from mavros_msgs.msg import Altitude
+from std_msgs.msg import Float64
+from mavros.msg import Controls
+
 
 def ulg_sensors_broadcaster():
     """
@@ -74,6 +78,13 @@ def ulg_sensors_broadcaster():
                         one_msg = Altitude()
                         one_msg.amsl = row[0]
                         baro_pub.publish(one_msg)
+                    elif message_name =="controls":
+                        one_msg = Controls()
+                        one_msg.c_r=row[0]
+                        one_msg.c_p=row[1]
+                        one_msg.c_y=row[2]
+                        one_msg.c_u=row[3]
+                        control_pub.publish(one_msg)
 
                     elif message_name == "ekf":
                         # ROS uses ENU frame while px4 ulg uses NED, so switch x & y and negate z
@@ -112,6 +123,7 @@ if __name__=='__main__':
 
                 "imu" : {"file" : '_sensor_combined',      "cols" : ["gyro_rad["+str(i)+"]" for i in range(3)] + \
                                                                     ["accelerometer_m_s2["+str(i)+"]" for i in range(3)]},
+                "controls" : {"file" : '_actuator_controls_0',     "cols" : ["control["+str(i)+"]" for i in range(4)]}
                 }
 
     # change the working directory to this script's directory
@@ -150,6 +162,7 @@ if __name__=='__main__':
     imu_pub = rospy.Publisher('mavros/imu/data', Imu, queue_size=1)
     mag_pub = rospy.Publisher('mavros/imu/mag', MagneticField, queue_size=1)
     baro_pub = rospy.Publisher('mavros/altitude', Altitude, queue_size=1)
+    control_pub=rospy.Publisher('mavros/controls',Controls, queue_size=1)
     ekf_pos_pub = rospy.Publisher('mavros/local_position/pose', PoseStamped, queue_size=1)
     ekf_vel_pub = rospy.Publisher('mavros/local_position/velocity_local', TwistStamped, queue_size=1)
 
