@@ -148,19 +148,12 @@ def create_dataset(session_data, colum_names):
             # vertically stack the feature and labels vectors of all flights
             combined_windowed_features[set_subdir] = np.vstack(x_list)
             combined_windowed_labels[set_subdir] = np.vstack(y_list)
-            print("11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111")
-            print(combined_windowed_labels)
-
-            print("11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111")
 
             # # shuffle features and labels together
             shuffled_indices = np.arange(combined_windowed_features[set_subdir].shape[0])
             np.random.shuffle(shuffled_indices)
             combined_windowed_features[set_subdir] = combined_windowed_features[set_subdir][shuffled_indices]
             combined_windowed_labels[set_subdir] = combined_windowed_labels[set_subdir][shuffled_indices] 
-            print("2222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222")
-            print(combined_windowed_labels)
-            print("222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222")
 
         # save the dataset to files (features, labels)
         with open(os.path.join(datasets_directory, "features_labels"), 'wb') as features_labels_file:
