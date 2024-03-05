@@ -40,7 +40,7 @@ from std_msgs.msg import Float64
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from sensor_msgs.msg import Imu, MagneticField
 from mavros_msgs.msg import Altitude
-from mavros.msg import ListOfLists, PythonList, DeepNavPrediction, PosVel
+from mavros.msg import ListOfLists, PythonList, DeepNavPrediction, PosVel,Controls
 
 def make_prediction(data):
     """
@@ -86,10 +86,15 @@ def make_prediction(data):
         window_arr = np.array(window_list, dtype=np.float32)
         
         # reshape it to be compatible with the network input (batch size, timesteps, n_features)
-        window_arr = np.resize(window_arr, (1,window_size,10))
+        # window_arr = np.resize(window_arr, (1,window_size,10))
         
-        # predict labels (changes in position in NED) and accumulate them to the position
-        delta_position = model.predict(window_arr, batch_size=1).reshape((3,))
+        # # predict labels (changes in position in NED) and accumulate them to the position
+        # delta_position = model.predict(window_arr, batch_size=1).reshape((3,))
+    
+        window_arr = window_arr.reshape((1, window_size ,14))
+        predictions = model(window_arr)
+        delta_position = predictions[0].numpy().reshape((3,))
+
         make_prediction.pos_nn += delta_position
 
         # velocity is the change in position divided by time interval (dt is 0.2 s => * 5)
@@ -175,7 +180,8 @@ def window_maintainer(time_float):
     # so we must negate them (Forward-Left-Up -> Forward-Right-Down)
     features_row = [features["w_x"] / counters["imu"],     - features["w_y"] / counters["imu"],     - features["w_z"] / counters["imu"], 
                     features["a_x"] / counters["imu"],     - features["a_y"] / counters["imu"],     - features["a_z"] / counters["imu"], 
-                    features["m_x"]/counters["mag"]*10000, - features["m_y"]/counters["mag"]*10000, - features["m_z"]/counters["mag"]*10000, 
+                    features["m_x"]/counters["mag"]*10000, - features["m_y"]/counters["mag"]*10000, - features["m_z"]/counters["mag"]*10000,
+                    features["c_r"] / counters["controls"],features["c_p"]/ counters["controls"],features["c_y"]/ counters["controls"],   features["c_u"]/ counters["controls"],
                     altitude_difference
                     ]
 
@@ -238,6 +244,14 @@ def sensors_callback(data, sensor_name):
             features["h"] += data.amsl
         
         counters["alt"] += 1
+        
+    elif sensor_name=="controls":
+        features["c_r"] += data.c_r
+        features["c_p"] += data.c_p
+        features["c_y"] += data.c_y
+        features["c_u"] += data.c_u
+        counters["controls"]+=1
+
     
     elif sensor_name == "ekf_position":
         # ROS uses ENU frame while px4 ulg uses NED, so switch x & y and negate z
@@ -263,6 +277,7 @@ def sensors_listener():
     _ = rospy.Subscriber('mavros/imu/data', Imu, sensors_callback, "imu", queue_size=100)
     _ = rospy.Subscriber('mavros/imu/mag', MagneticField, sensors_callback, "mag", queue_size=100)
     _ = rospy.Subscriber('mavros/altitude', Altitude, sensors_callback, "alt", queue_size=100)
+    _ = rospy.Subscriber("mavros/controls",Controls,sensors_callback,"controls",queue_size=100)
 
     # subscribe to window maintainer and nn_predictor
     _ = rospy.Subscriber('deep_nav/sensors_ts', Float64, window_maintainer, queue_size=15)
@@ -312,10 +327,11 @@ if __name__=='__main__':
     features = {"w_x" : 0.0, "w_y" : 0.0, "w_z" : 0.0,
                 "a_x" : 0.0, "a_y" : 0.0, "a_z" : 0.0,
                 "m_x" : 0.0, "m_y" : 0.0, "m_z" : 0.0,
+                "c_r":0.0,   "c_p":0.0,   "c_y":0.0,  "c_u":0.0,
                 "h_0" : None,  "h" : 0.0
                 }
     
-    counters = {"imu" : 0, "mag" : 0, "alt" : 0}
+    counters = {"imu" : 0, "mag" : 0, "alt" : 0,"controls":0}
 
     ekf_position = np.zeros((3,))
     ekf_velocity = np.zeros((3,))
@@ -327,7 +343,7 @@ if __name__=='__main__':
     print("loading Tensorflow model ...")
     trial_folder = os.path.join(os.path.pardir, "DeepNav_results", "trial_" + str(trial_number).zfill(3))
     tf_model_path = os.path.join(trial_folder, "tf_saved_model") 
-    model = tf.keras.models.load_model(tf_model_path)
+    model = tf.saved_model.load(tf_model_path)
 
     # create a static variable to hold the states, predictions are delta states
     # and should be accumulated to the states vector
@@ -360,7 +376,7 @@ if __name__=='__main__':
     predictions_file = os.path.join(realtime_out_folder, "realtime_predictions" + files_creation_time + ".csv")
 
     with open(features_labels_file, 'w') as f:
-        csv_header = "w_x,w_y,w_z,a_x,a_y,a_z,m_x,m_y,m_z,h,Vn,Ve,Vd,Pn,Pe,Pd\n"
+        csv_header = "w_x,w_y,w_z,a_x,a_y,a_z,m_x,m_y,m_z,h,c_r,c_p,c_y,c_u,Vn,Ve,Vd,Pn,Pe,Pd\n"
         f.write(csv_header)
     with open(predictions_file, 'w') as f:
         csv_header = "Vn,Ve,Vd,Pn,Pe,Pd\n"
