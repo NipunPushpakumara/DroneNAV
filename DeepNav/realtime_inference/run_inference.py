@@ -38,8 +38,9 @@ import tensorflow as tf
 import rospy
 from std_msgs.msg import Float64
 from geometry_msgs.msg import PoseStamped, TwistStamped
-from sensor_msgs.msg import Imu, MagneticField,FluidPressure
-from drone_ros1.msg import ListOfLists, PythonList, DeepNavPrediction, PosVel
+from sensor_msgs.msg import Imu, MagneticField
+from mavros_msgs.msg import Altitude
+from mavros.msg import ListOfLists, PythonList, DeepNavPrediction, PosVel
 
 def make_prediction(data):
     """
@@ -84,11 +85,16 @@ def make_prediction(data):
         # convert the 2D list to np.array
         window_arr = np.array(window_list, dtype=np.float32)
         
-        # reshape it to be compatible with the network input (batch size, timesteps, n_features)
-        window_arr = np.resize(window_arr, (1,window_size,10))
+        # # reshape it to be compatible with the network input (batch size, timesteps, n_features)
+        # window_arr = np.resize(window_arr, (1,window_size,10))
         
-        # predict labels (changes in position in NED) and accumulate them to the position
-        delta_position = model.predict(window_arr, batch_size=1).reshape((3,))
+        # # predict labels (changes in position in NED) and accumulate them to the position
+        # delta_position = model.predict(window_arr, batch_size=1).reshape((3,))
+
+        window_arr = window_arr.reshape((1, window_size ,10))
+        predictions = model(window_arr)
+        delta_position = predictions[0].numpy().reshape((3,))
+
         make_prediction.pos_nn += delta_position
 
         # velocity is the change in position divided by time interval (dt is 0.2 s => * 5)
@@ -326,7 +332,7 @@ if __name__=='__main__':
     print("loading Tensorflow model ...")
     trial_folder = os.path.join(os.path.pardir, "DeepNav_results", "trial_" + str(trial_number).zfill(3))
     tf_model_path = os.path.join(trial_folder, "tf_saved_model") 
-    model = tf.keras.models.load_model(tf_model_path)
+    model = tf.saved_model.load(tf_model_path)
 
     # create a static variable to hold the states, predictions are delta states
     # and should be accumulated to the states vector
