@@ -78,12 +78,12 @@ with open(flight_names_csv, "w") as f:
     for flight_name in flight_names:
         writer.writerow([flight_name])
 
-messages = {"ekf" : {"file" : '_estimator_status',     "cols" : ["states["+str(i)+"]" for i in range(10)]},
-            "mag" : {"file" : '_vehicle_magnetometer', "cols" : ["magnetometer_ga["+str(i)+"]" for i in range(3)]},
-            "baro": {"file" : '_vehicle_air_data',     "cols" : ["baro_alt_meter", "baro_temp_celcius"]},
-            "imu" : {"file" : '_sensor_combined',      "cols" : ["gyro_rad["+str(i)+"]" for i in range(3)] + \
+messages = {"ekf" :         {"file" : '_estimator_status',     "cols" : ["states["+str(i)+"]" for i in range(10)]},
+            "mag" :         {"file" : '_vehicle_magnetometer', "cols" : ["magnetometer_ga["+str(i)+"]" for i in range(3)]},
+            "baro":         {"file" : '_vehicle_air_data',     "cols" : ["baro_alt_meter", "baro_temp_celcius"]},
+            "imu" :         {"file" : '_sensor_combined',      "cols" : ["gyro_rad["+str(i)+"]" for i in range(3)] + \
                                                                 ["accelerometer_m_s2["+str(i)+"]" for i in range(3)]},
-            "controls":{"file":"_actuator_controls_0","cols":["control["+str(i)+"]" for i in range(4)]}
+            "controls" :    {"file":"_actuator_controls_0",    "cols":["control["+str(i)+"]" for i in range(4)]},
             }
 
 # iterate on the flights (one folder per flight)
@@ -139,7 +139,7 @@ with PdfPages(all_flights_pdf) as pdf:
         # combine all the averaged data in one array (11+10) x n
         combined_data = np.concatenate((messages["imu"]["data"], messages["mag"]["data"],
                                         messages["baro"]["data"], messages["controls"]['data'],messages["ekf"]["data"]), axis=1)
-        header = "w_x,w_y,w_z,a_x,a_y,a_z,m_x,m_y,m_z,h,c_r,c_p,c_y,c_u,T,q0,q1,q2,q3,Vn,Ve,Vd,Pn,Pe,Pd"
+        header = "w_x,w_y,w_z,a_x,a_y,a_z,m_x,m_y,m_z,h,T,c_r,c_p,c_y,c_u,q_0,q_1,q_2,q_3,Vn,Ve,Vd,Pn,Pe,Pd"
 
         # remove rows that contain nans
         combined_data = combined_data[~np.isnan(combined_data).any(axis=1)]
